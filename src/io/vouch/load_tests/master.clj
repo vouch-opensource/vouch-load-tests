@@ -27,7 +27,7 @@
                                (assoc :reporter reporter)
                                (assoc :terminate-scenario #(close! terminator))
                                (dissoc :create-executor-state)
-                               (merge (select-keys pool [:behavior :tags :workflow]))
+                               (merge (dissoc pool :actors))
                                (assoc :id (str "executor-" (count @executors) "-" workflow)
                                       :get-executors #(deref executors)
                                       :state (atom (merge
