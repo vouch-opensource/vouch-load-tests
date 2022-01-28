@@ -45,9 +45,8 @@
             (let [start  (System/currentTimeMillis)
                   result (<! (execute-task executor task))
                   end    (System/currentTimeMillis)]
-              (>! reporter {:duration (- end start) :task task :executor id})
-              (when (instance? Throwable result)
-                (log/error id "Failed to handle task" task result)))
+              (>! reporter (cond-> {:duration (- end start) :task task :executor id}
+                             (instance? Throwable result) (assoc :error result))))
             (finally (close! done)))
           (recur)))
       (log/info "Stopping executor" id))
