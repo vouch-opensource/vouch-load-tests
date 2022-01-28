@@ -17,7 +17,8 @@
     :hours (* value 1000 60 60)
     :minutes (* value 1000 60)
     :seconds (* value 1000)
-    value))
+    :milliseconds value
+    (throw (ex-info "Unsupported unit" {:unit unit}))))
 
 (defn duration-definition->number
   [definition unit]
