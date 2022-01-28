@@ -266,7 +266,7 @@ Pause executor for a duration of time. Default unit is seconds.
 
 ### Loop task
 
-Repeat a sequence of tasks several times.
+Repeat a sequence of tasks given number of times or withing some time duration.
 
 ```clojure
 {:task  :loop
@@ -276,6 +276,15 @@ Repeat a sequence of tasks several times.
 ```
 
 The above example sends 3 friend requests waiting between 1 and 2 seconds in between.
+
+```clojure
+{:task     :loop
+ :duration [200 500]
+ :unit     :milliseconds
+ :tasks    [{:task :register-user}]}
+```
+
+Here we attempt to register users as many users as possible between 200 and 500 milliseconds.
 
 ### Terminate scenario task
 
