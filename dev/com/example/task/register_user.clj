@@ -2,7 +2,7 @@
   (:require
     [cheshire.core :as json]
     [clj-http.client :as http]
-    [clojure.core.async :refer [<! go timeout]]
+    [clojure.core.async :refer [go]]
     [clojure.tools.logging :as log]
     [io.vouch.load-tests.executor :as executor]))
 
