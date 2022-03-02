@@ -48,11 +48,18 @@ with appropriate selector. Let's suppose we want to implement `:register-user` t
   [executor msg]
   (go
     (let [email    (str "tester-" (rand) "@example.com")
-          password (str (rand))]
+          password (str (rand))
+          chan     (chan)]
       (http/post (str "http://example.com/api/user/register")
         {:body    (json/encode {:email email :password password})
+         :async?  true
          :headers {:content-type "application/json"
-                   :accept       "application/json"}}))))
+                   :accept       "application/json"}}
+        #(if-let [result (some-> % :body (json/decode true))]
+           (put! chan result)
+           (close! chan))
+        #(put! chan %))
+      chan)))
 ```
 
 > It is important to note that `execute-task` function must return a channel that signals when task is finished.
@@ -78,11 +85,18 @@ With that we can access the `api-url` inside the task:
   [{:keys [api-url]} msg]
   (go
     (let [email    (str "tester-" (rand) "@example.com")
-          password (str (rand))]
+          password (str (rand))
+          chan     (chan)]
       (http/post (str api-url "/user/register")
         {:body    (json/encode {:email email :password password})
+         :async?  true
          :headers {:content-type "application/json"
-                   :accept       "application/json"}}))))
+                   :accept       "application/json"}}
+        #(if-let [result (some-> % :body (json/decode true))]
+           (put! chan result)
+           (close! chan))
+        #(put! chan %))
+      chan)))
 ```
 
 Similarly, we can tackle generation of random but unique emails.
@@ -101,11 +115,18 @@ Similarly, we can tackle generation of random but unique emails.
   [{:keys [api-url unique-email]} msg]
   (go
     (let [email    (unique-email)
-          password (str (rand))]
+          password (str (rand))
+          chan     (chan)]
       (http/post (str api-url "/user/register")
         {:body    (json/encode {:email email :password password})
+         :async?  true
          :headers {:content-type "application/json"
-                   :accept       "application/json"}}))))
+                   :accept       "application/json"}}
+        #(if-let [result (some-> % :body (json/decode true))]
+           (put! chan result)
+           (close! chan))
+        #(put! chan %))
+      chan)))
 ```
 
 > The `create-unique-generator` function is not so important for this article, but if you're interested here's the code:
@@ -138,11 +159,17 @@ for subsequent tasks.
 ```clojure
 (defn- register-user
   [api-url email password]
-  (let [response (http/post (str api-url "/user/register")
-                   {:body    (json/encode {:email email :password password})
-                    :headers {:content-type "application/json"
-                              :accept       "application/json"}})]
-    (some-> response :body (json/decode true) :token)))
+  (let [chan (chan)]
+    (http/post (str api-url "/user/register")
+      {:body    (json/encode {:email email :password password})
+       :async?  true
+       :headers {:content-type "application/json"
+                 :accept       "application/json"}}
+      #(if-let [result (some-> % :body (json/decode true) :token)]
+         (put! chan result)
+         (close! chan))
+      #(put! chan %))
+    chan))
 
 (defmethod io.vouch.load-tests.executor/execute-task :register-user
   [{:keys [api-url id unique-email state]} msg]
@@ -150,8 +177,10 @@ for subsequent tasks.
     (log/info id msg)
     (let [email    (unique-email)
           password (str (rand))
-          token    (register-user api-url email password)]
-      (swap! state assoc :auth-token token))))
+          token    (<! (register-user api-url email password))]
+      (if (instance? Exception token)
+        token
+        (swap! state assoc :auth-token token)))))
 ```
 
 You can see on the last line that we're updating executor's state with `auth-token`. We've extracted the logic
@@ -162,10 +191,17 @@ Now we can access the token form another task:
 ```clojure
 (defn- friend-requests
   [api-url auth-token]
-  (http/get (str api-url "/user/friend-requests")
-    {:headers {:authorization (str "Bearer " auth-token)
-               :content-type  "application/json"
-               :accept        "application/json"}}))
+  (let [chan (chan)]
+    (http/get (str api-url "/user/friend-requests")
+      {:async?  true
+       :headers {:authorization (str "Bearer " auth-token)
+                 :content-type  "application/json"
+                 :accept        "application/json"}}
+      #(if-let [result (some-> % :body (json/decode true))]
+         (put! chan result)
+         (close! chan))
+      #(put! chan %))
+    chan))
 
 (defmethod io.vouch.load-tests.executor/execute-task :listen-to-friend-requests
   [{:keys [api-url id state]} msg]
@@ -292,6 +328,43 @@ Stops master and all executors.
 
 ```clojure
 {:task :terminate-scenario}
+```
+
+### Caveats
+
+#### Starving core.async thread pool
+
+Be careful not to use blocking operations when implementing tasks, otherwise you could easily starve `core.async` thread
+pool if server takes longer time to respond, and you spawn many actors:
+
+```clojure
+(defmethod io.vouch.load-tests.executor/execute-task :register-user
+  [{:keys [api-url]} msg]
+  (go
+    (let [email    (str "tester-" (rand) "@example.com")
+          password (str (rand))]
+      (clj-http.client/post (str api-url "/user/register")
+        {:body    (json/encode {:email email :password password})
+         :headers {:content-type "application/json"
+                   :accept       "application/json"}}))))
+```
+
+The `clj-http.client/post` is by default blocking, so even though this happens in a `go` block, the thread that executes
+that block is actually getting blocked, and `core.async` has limited number of threads in its pool. Here is proper
+implementation:
+
+```clojure
+(let [chan (async/chan)]
+    (http/post (str "http://example.com/api/user/register")
+        {:body    (json/encode {:email email :password password})
+         :async?  true
+         :headers {:content-type "application/json"
+                   :accept       "application/json"}}
+        #(if-let [result (some-> % :body (json/decode true))]
+           (put! chan result)
+           (close! chan))
+        #(put! chan %))
+    chan)
 ```
 
 ## Development
