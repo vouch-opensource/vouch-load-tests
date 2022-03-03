@@ -28,11 +28,15 @@
                  {:workflow :listeners :actors 1 :tags [:singleton]}
                  {:workflow :inviter :actors 10}]})
 
+(defn- count-actors
+  [scenario]
+  (reduce #(+ %1 (:actors %2)) 0 (:actor-pools scenario)))
+
 (defn go []
   (reset! server
     (let [jetty  (jetty/run-jetty sample-backend/handler {:port 3000 :join? false})
-          system (core/start-system {:reporter   #_(reporter/create-csv-reporter "output.csv")
-                                               (reporter/create-log-reporter)
+          system (core/start-system {:reporter   #_(reporter/create-csv-reporter "output.csv" (count-actors scenario) true)
+                                     (reporter/create-log-reporter (count-actors scenario))
                                      :api-url  "http://localhost:3000/api"
                                      :scenario scenario})]
       (reify Closeable
