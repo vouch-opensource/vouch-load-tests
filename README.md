@@ -355,16 +355,38 @@ implementation:
 
 ```clojure
 (let [chan (async/chan)]
-    (http/post (str "http://example.com/api/user/register")
-        {:body    (json/encode {:email email :password password})
-         :async?  true
-         :headers {:content-type "application/json"
-                   :accept       "application/json"}}
-        #(if-let [result (some-> % :body (json/decode true))]
-           (put! chan result)
-           (close! chan))
-        #(put! chan %))
-    chan)
+  (http/post (str "http://example.com/api/user/register")
+    {:body    (json/encode {:email email :password password})
+     :async?  true
+     :headers {:content-type "application/json"
+               :accept       "application/json"}}
+    #(if-let [result (some-> % :body (json/decode true))]
+       (put! chan result)
+       (close! chan))
+    #(put! chan %))
+  chan)
+```
+
+#### Reporter
+
+When starting `io.vouch.load-tests.master` one of required config elements is reporter. It must be a `core.async`
+channel. Keep in mind that you can put only 1024 pending messages on the channel, so if you have more actors than you
+should provide a buffer to the channel.
+
+This results in an exception:
+
+```clojure
+(let [c (clojure.core.async/chan)]
+  (doseq [_ (range 1025)]
+    (clojure.core.async/go (clojure.core.async/put! c 1))))
+```
+
+While this is perfectly fine:
+
+```clojure
+(let [c (clojure.core.async/chan 2222)]
+  (doseq [_ (range 2222)]
+    (clojure.core.async/go (clojure.core.async/put! c 1))))
 ```
 
 ## Development
@@ -374,3 +396,4 @@ In order to run sample tests:
     clj -A:dev
     (dev)
     (reset)
+             

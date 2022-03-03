@@ -6,9 +6,9 @@
     [clojure.tools.logging :as log]))
 
 (defn create-csv-reporter
-  ([log-file-name] (create-csv-reporter log-file-name false))
-  ([log-file-name errors-to-console?]
-   (let [reporting (chan)]
+  ([log-file-name] (create-csv-reporter log-file-name nil false))
+  ([log-file-name buf-or-n errors-to-console?]
+   (let [reporting (chan buf-or-n)]
      (go
        (with-open [writer (io/writer log-file-name)]
          (csv/write-csv writer
@@ -24,14 +24,15 @@
      reporting)))
 
 (defn create-log-reporter
-  []
-  (let [reporting (chan)]
-    (go
-      (loop []
-        (when-let [{:keys          [duration executor error]
-                    {:keys [task]} :task} (<! reporting)]
-          (if error
-            (log/error executor "Failed to handle task" task error)
-            (log/info (format "%s took %dms %s" task duration executor)))
-          (recur))))
-    reporting))
+  ([] (create-log-reporter nil))
+  ([buffer]
+   (let [reporting (chan buffer)]
+     (go
+       (loop []
+         (when-let [{:keys          [duration executor error]
+                     {:keys [task]} :task} (<! reporting)]
+           (if error
+             (log/error executor "Failed to handle task" task error)
+             (log/info (format "%s took %dms %s" task duration executor)))
+           (recur))))
+     reporting)))
