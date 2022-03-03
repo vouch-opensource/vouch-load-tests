@@ -1,7 +1,7 @@
 (ns io.vouch.load-tests.executor
   (:require
     [clojure.core.async :refer [<! >! chan close! go]]
-    [clojure.set :refer [intersection subset?]]
+    [clojure.set :refer [subset?]]
     [clojure.tools.logging :as log]))
 
 (def stop-event ::stop)

@@ -1,6 +1,6 @@
 (ns io.vouch.load-tests.task.wait
   (:require
-    [clojure.core.async :refer [<! go timeout thread]]
+    [clojure.core.async :refer [<! go timeout]]
     [clojure.tools.logging :as log]
     [io.vouch.load-tests.executor :as executor]
     [io.vouch.load-tests.task.definition.converter :as definition-converter]))
