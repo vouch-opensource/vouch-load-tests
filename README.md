@@ -31,11 +31,11 @@ responsible for providing implementation of the task. The framework ships with a
 I.e. `{:task :wait :duration 5}` the `wait` task requires `duration` property.
 
 ```clojure
-(defmethod io.vouch.load-tests.executor/execute-task :wait
-  [{:keys [id] :as executor} {:keys [duration] :as task}]
+(defmethod executor/execute-task :wait
+  [{:keys [id index]} {:keys [duration multiply-by-index] :as msg}]
   (go
-    (log/info id task)
-    (<! (timeout (* 1000 duration)))))
+    (log/info id msg)
+    (<! (timeout (* duration (if (true? multiply-by-index) index 1))))))
 ```
 
 ## Handling task failure
@@ -307,6 +307,8 @@ Pause executor for a duration of time. Default unit is seconds.
 {:task :wait :duration 500 :unit :milliseconds} ; wait 500 milliseconds
 {:task :wait :duration 1 :unit :minutes} ; wait 1 minute
 {:task :wait :duration [3 8]} ; wait random duration between 3 and 8 seconds
+{:task :wait :duration 2 :multiply-by :index} ; first executor (index=0) waits 0 seconds, second executor (index=1) waits 1*2 seconds, third executor (index=2) waits 2*2 seconds
+{:task :wait :duration 2 :multiply-by :reversed-index} ; given there are 3 executors: first executor (index=0) waits (3-1-0)*2 seconds, second executor (index=1) waits (3-1-1)*2 seconds, third executor (index=2) waits (3-1-2)*2 seconds
 ```
 
 ### Loop task
