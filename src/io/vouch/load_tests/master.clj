@@ -23,13 +23,15 @@
             schedule-completions (atom [])]
         (doseq [{:keys [workflow actors] :as pool} actor-pools]
           (doseq [_ (range actors)]
-            (let [executor (executor/create
+            (let [index    (count @executors)
+                  executor (executor/create
                              (-> config
                                  (assoc :reporter reporter)
                                  (assoc :terminate-scenario #(close! terminator))
                                  (dissoc :create-executor-state)
                                  (merge (dissoc pool :actors))
-                                 (assoc :id (str "executor-" (count @executors) "-" workflow)
+                                 (assoc :id (str "executor-" index "-" workflow)
+                                        :index index
                                         :get-executors #(deref executors)
                                         :state (atom (merge
                                                        {}
