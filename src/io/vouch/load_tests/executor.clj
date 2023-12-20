@@ -1,12 +1,10 @@
 (ns io.vouch.load-tests.executor
   (:require
-    [clojure.core.async :refer [<! >! chan close! go]]
+    [clojure.core.async :refer [<! >! chan close! go promise-chan]]
     [clojure.set :refer [subset?]]
     [clojure.tools.logging :as log]))
 
 (def stop-event ::stop)
-
-(def ^:private accepts-keys-behavior :accepts-keys)
 
 (defn add-listener
   [executor event listener]
@@ -14,18 +12,15 @@
 
 (defn get-behavior
   [executor]
-  (merge {accepts-keys-behavior true} (:behavior executor)))
-
-(defn accepts-keys?
-  [executor]
-  (boolean (get (get-behavior executor) accepts-keys-behavior)))
+  (merge {} (:behavior executor)))
 
 (defn schedule
   [executor task]
   (letfn [(do-schedule [executor task]
-            (go (let [ch (chan)]
-                  (>! (:inbound executor) [task ch])
-                  (<! ch))))]
+            (go (let [ch (promise-chan)]
+                  (if (>! (:inbound executor) [task ch])
+                    (<! ch)
+                    (close! ch)))))]
     (go
       (if (or (vector? task) (seq? task))
         (doseq [task task]
@@ -35,7 +30,7 @@
 (defmulti execute-task (fn [_ msg] (:task msg)))
 
 (defn create
-  [{:keys [id reporter state] :as config}]
+  [{:keys [id reporter state terminate-scenario] :as config}]
   (let [ch       (chan)
         executor (assoc config :inbound ch :state (or state (atom {})))]
     (go
@@ -46,7 +41,13 @@
                   result (<! (execute-task executor task))
                   end    (System/currentTimeMillis)]
               (>! reporter (cond-> {:duration (- end start) :task task :executor id}
-                             (instance? Throwable result) (assoc :error result))))
+                                   (instance? Throwable result) (assoc :error result)))
+              (when (instance? Throwable result)
+                (condp = (:on-error task)
+                  :stop-executor (close! ch)
+                  :terminate-scenario (do
+                                        (close! ch)
+                                        (terminate-scenario)))))
             (finally (close! done)))
           (recur)))
       (log/info "Stopping executor" id))

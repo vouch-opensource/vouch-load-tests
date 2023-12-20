@@ -38,6 +38,15 @@ I.e. `{:task :wait :duration 5}` the `wait` task requires `duration` property.
     (<! (timeout (* 1000 duration)))))
 ```
 
+## Handling task failure
+
+Task failures, by default, are merely reported and the workflow proceeds as usual.
+However, you can alter this default behavior by incorporating the `:on-error` attribute into the task.
+The permissible values for this attribute are:
+
+* `:stop-executor`
+* `:terminate-workflow`
+
 ## Implementing a task
 
 In order to implement a new type of task you have to provide `defmethod io.vouch.load-tests.executor/execute-task`

@@ -19,23 +19,30 @@
       (stop close))
     (go
       (let [{:keys [workflows actor-pools]} scenario
-            executors (atom [])]
+            executors            (atom [])
+            schedule-completions (atom [])]
         (doseq [{:keys [workflow actors] :as pool} actor-pools]
           (doseq [_ (range actors)]
             (let [executor (executor/create
                              (-> config
-                               (assoc :reporter reporter)
-                               (assoc :terminate-scenario #(close! terminator))
-                               (dissoc :create-executor-state)
-                               (merge (dissoc pool :actors))
-                               (assoc :id (str "executor-" (count @executors) "-" workflow)
-                                      :get-executors #(deref executors)
-                                      :state (atom (merge
-                                                     {}
-                                                     (and create-executor-state (create-executor-state)))))))
+                                 (assoc :reporter reporter)
+                                 (assoc :terminate-scenario #(close! terminator))
+                                 (dissoc :create-executor-state)
+                                 (merge (dissoc pool :actors))
+                                 (assoc :id (str "executor-" (count @executors) "-" workflow)
+                                        :get-executors #(deref executors)
+                                        :state (atom (merge
+                                                       {}
+                                                       (and create-executor-state (create-executor-state)))))))
                   steps    (get workflows workflow)]
               (swap! executors conj executor)
-              (executor/schedule executor (map task-definition->task steps)))))
+              (swap! schedule-completions conj
+                     (executor/schedule executor (map task-definition->task steps))))))
+        (go
+          (doseq [completion @schedule-completions]
+            (<! completion))
+          (log/info "All executors finished, terminating scenario")
+          (close! terminator))
         (<! close)
         (close! reporter)
         (close! terminator)
