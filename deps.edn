@@ -8,7 +8,7 @@
  :aliases {:dev {:extra-paths ["dev"]
                  :extra-deps  {cheshire/cheshire           {:mvn/version "5.10.0"}
                                clj-http/clj-http           {:mvn/version "3.12.1"}
-                               metosin/reitit-ring         {:mvn/version "0.5.13"}
+                               metosin/reitit-ring         {:mvn/version "0.7.0-alpha7"}
                                org.clojure/tools.namespace {:mvn/version "0.3.1"}
                                ring/ring-core              {:mvn/version "1.10.0"}
                                ring/ring-jetty-adapter     {:mvn/version "1.10.0"}}}}}
